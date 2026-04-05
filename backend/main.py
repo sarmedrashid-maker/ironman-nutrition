@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from database import engine, Base, SessionLocal
+from models import User
 from routers import users, meals, food_log, training, progress
 
 Base.metadata.create_all(bind=engine)
@@ -28,7 +29,19 @@ def migrate_db():
                 pass  # Column already exists
 
 
+def seed_if_empty():
+    """Run seed data if no users exist (e.g. fresh Railway deploy)."""
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            import seed
+            seed.seed()
+    finally:
+        db.close()
+
+
 migrate_db()
+seed_if_empty()
 
 app = FastAPI(title="Ironman Nutrition Tracker", version="1.0.0")
 
@@ -36,6 +49,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://ironman-nutrition-production-e844.up.railway.app",
+    "https://ironman-nutrition-production-c05e.up.railway.app",
 ]
 
 app.add_middleware(
