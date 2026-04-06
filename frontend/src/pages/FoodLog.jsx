@@ -37,6 +37,7 @@ export default function FoodLog() {
   // Library modal
   const [showLibrary, setShowLibrary] = useState(false)
   const [libTargetCat, setLibTargetCat] = useState('breakfast')
+  const [libServings, setLibServings] = useState({})
 
   // Day notes
   const [instructions, setInstructions] = useState('')
@@ -104,8 +105,25 @@ export default function FoodLog() {
 
   // ── Library ──
   const handleAddMeal = async (meal) => {
-    await api.foodLog.addMealToLog(meal.id, selectedDate, libTargetCat)
+    const servings = parseFloat(libServings[meal.id]) || 1
+    if (servings === 1) {
+      await api.foodLog.addMealToLog(meal.id, selectedDate, libTargetCat)
+    } else {
+      await api.foodLog.addEntry({
+        daily_log_id:  log.id,
+        meal_category: libTargetCat,
+        description:   `${meal.name} (${servings} serving${servings !== 1 ? 's' : ''})`,
+        calories:      meal.calories * servings,
+        protein_g:     meal.protein_g * servings,
+        carbs_g:       meal.carbs_g * servings,
+        fat_g:         meal.fat_g * servings,
+        has_mammal:    false,
+        source:        'meal_library',
+        raw_input:     `${meal.name} x${servings}`,
+      })
+    }
     setShowLibrary(false)
+    setLibServings({})
     await loadLog()
   }
 
@@ -386,22 +404,42 @@ export default function FoodLog() {
               <div className="empty-state">No meals in library yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {meals.map(m => (
-                  <div key={m.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 14px', background: 'var(--bg-input)',
-                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
-                  }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
-                      <div className="text-sm text-muted">
-                        {Math.round(m.calories)} kcal · {Math.round(m.protein_g)}g P · {Math.round(m.carbs_g)}g C · {Math.round(m.fat_g)}g F
-                        <span style={{ marginLeft: 8, opacity: 0.5 }}>{m.meal_type}</span>
+                {meals.map(m => {
+                  const servings = parseFloat(libServings[m.id]) || 1
+                  return (
+                    <div key={m.id} style={{
+                      padding: '10px 14px', background: 'var(--bg-input)',
+                      borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
+                          <div className="text-sm text-muted">
+                            {Math.round(m.calories * servings)} kcal · {Math.round(m.protein_g * servings)}g P · {Math.round(m.carbs_g * servings)}g C · {Math.round(m.fat_g * servings)}g F
+                            <span style={{ marginLeft: 8, opacity: 0.5 }}>{m.meal_type}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <input
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            value={libServings[m.id] ?? 1}
+                            onChange={e => setLibServings(s => ({ ...s, [m.id]: e.target.value }))}
+                            style={{
+                              width: 52, textAlign: 'center', fontSize: 13,
+                              background: 'var(--bg-card)', border: '1px solid var(--border)',
+                              borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)',
+                              padding: '4px 6px',
+                            }}
+                          />
+                          <span className="text-muted" style={{ fontSize: 12 }}>srv</span>
+                          <button className="btn btn-secondary btn-sm" onClick={() => handleAddMeal(m)}>Add</button>
+                        </div>
                       </div>
                     </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => handleAddMeal(m)}>Add</button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

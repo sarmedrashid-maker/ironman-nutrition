@@ -31,8 +31,13 @@ export default function Dashboard() {
   const [log, setLog] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [date, setDate] = useState(todayISO())
 
-  const date = todayISO()
+  const shiftDay = (n) => {
+    const d = new Date(date + 'T00:00:00')
+    d.setDate(d.getDate() + n)
+    setDate(d.toISOString().slice(0, 10))
+  }
 
   const loadLog = useCallback(() => api.foodLog.get(date).then(setLog), [date])
 
@@ -70,10 +75,19 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-24">
         <div>
           <h1 className="page-title" style={{ marginBottom: 2 }}>Dashboard</h1>
-          <div className="text-secondary" style={{ fontSize: 13 }}>
-            {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-              weekday: 'long', month: 'long', day: 'numeric',
-            })}
+          <div className="flex items-center gap-8" style={{ marginTop: 2 }}>
+            <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px' }} onClick={() => shiftDay(-1)}>‹</button>
+            <span className="text-secondary" style={{ fontSize: 13 }}>
+              {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric',
+              })}
+            </span>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ padding: '2px 8px' }}
+              onClick={() => shiftDay(1)}
+              disabled={date >= todayISO()}
+            >›</button>
           </div>
         </div>
         <div className="flex gap-8 items-center">
