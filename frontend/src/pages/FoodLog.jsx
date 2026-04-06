@@ -1,30 +1,33 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api'
+import { useUser } from '../contexts/UserContext'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
 const CATEGORIES = [
-  { key: 'breakfast', label: 'Breakfast',  placeholder: 'e.g. "a bowl of oatmeal with blueberries and a coffee with oat milk"' },
-  { key: 'lunch',     label: 'Lunch',      placeholder: 'e.g. "tuna rice bowl with edamame and soy sauce"' },
-  { key: 'dinner',    label: 'Dinner',     placeholder: 'e.g. "grilled salmon with roasted vegetables and brown rice"' },
-  { key: 'snack_1',   label: 'Snack 1',   placeholder: 'e.g. "banana with almond butter and two rice cakes"' },
-  { key: 'snack_2',   label: 'Snack 2',   placeholder: 'e.g. "protein shake with almond milk and spinach"' },
-  { key: 'snack_3',   label: 'Snack 3',   placeholder: 'e.g. "apple and a handful of walnuts"' },
+  { key: 'breakfast', label: 'Breakfast', placeholder: 'e.g. "a bowl of oatmeal with blueberries and a coffee with oat milk"' },
+  { key: 'lunch',     label: 'Lunch',     placeholder: 'e.g. "tuna rice bowl with edamame and soy sauce"' },
+  { key: 'dinner',    label: 'Dinner',    placeholder: 'e.g. "grilled salmon with roasted vegetables and brown rice"' },
+  { key: 'snack',     label: 'Snack',     placeholder: 'e.g. "banana with almond butter and two rice cakes"' },
 ]
+
+// Normalise legacy snack_1/2/3 keys to 'snack'
+const normCat = (cat) => (cat === 'snack_1' || cat === 'snack_2' || cat === 'snack_3') ? 'snack' : cat
 
 const MEAL_TYPE_TO_CAT = {
   breakfast: 'breakfast',
   lunch:     'lunch',
   dinner:    'dinner',
-  snack:     'snack_1',
+  snack:     'snack',
 }
 
 // Per-section state shape
 const emptySection = () => ({ input: '', parsing: false, preview: null, error: null })
 
 export default function FoodLog() {
+  const { userId } = useUser()
   const [log, setLog] = useState(null)
   const [meals, setMeals] = useState([])
   const [loading, setLoading] = useState(true)
@@ -38,6 +41,13 @@ export default function FoodLog() {
   const [showLibrary, setShowLibrary] = useState(false)
   const [libTargetCat, setLibTargetCat] = useState('breakfast')
   const [libServings, setLibServings] = useState({})
+
+  // Save to library modal
+  const [saveLibModal, setSaveLibModal] = useState(null) // null | { cat, entries }
+  const [saveLibName, setSaveLibName] = useState('')
+  const [saveLibMealType, setSaveLibMealType] = useState('breakfast')
+  const [saveLibSaving, setSaveLibSaving] = useState(false)
+  const [saveLibError, setSaveLibError] = useState(null)
 
   // Day notes
   const [instructions, setInstructions] = useState('')
@@ -54,16 +64,16 @@ export default function FoodLog() {
 
   // ── Data loading ──
   const loadLog = useCallback(() =>
-    api.foodLog.get(selectedDate).then(l => {
+    api.foodLog.get(selectedDate, userId).then(l => {
       setLog(l)
       setInstructions(l.special_instructions || '')
     })
-  , [selectedDate])
+  , [selectedDate, userId])
 
   useEffect(() => {
     setLoading(true)
     setSections({})
-    Promise.all([loadLog(), api.meals.list()])
+    Promise.all([loadLog(), api.meals.list(userId)])
       .then(([, m]) => setMeals(m))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -75,7 +85,7 @@ export default function FoodLog() {
     if (!input.trim()) return
     updateSection(cat, { parsing: true, error: null, preview: null })
     try {
-      const result = await api.foodLog.parse(input)
+      const result = await api.foodLog.parse(input, userId)
       updateSection(cat, { parsing: false, preview: result })
     } catch (e) {
       updateSection(cat, { parsing: false, error: e.message })
@@ -110,7 +120,7 @@ export default function FoodLog() {
   const handleAddMeal = async (meal) => {
     const servings = parseFloat(libServings[meal.id]) || 1
     if (servings === 1) {
-      await api.foodLog.addMealToLog(meal.id, selectedDate, libTargetCat)
+      await api.foodLog.addMealToLog(meal.id, selectedDate, libTargetCat, userId)
     } else {
       await api.foodLog.addEntry({
         daily_log_id:  log.id,
@@ -153,8 +163,47 @@ export default function FoodLog() {
   // ── Instructions ──
   const handleSaveInstructions = async () => {
     setSavingInstructions(true)
-    try { await api.foodLog.updateInstructions(selectedDate, instructions) }
+    try { await api.foodLog.updateInstructions(selectedDate, instructions, userId) }
     finally { setSavingInstructions(false) }
+  }
+
+  // ── Save section to Meal Library ──
+  const openSaveLib = (cat, catEntries) => {
+    setSaveLibName('')
+    setSaveLibMealType(cat === 'snack' ? 'snack' : cat)
+    setSaveLibError(null)
+    setSaveLibModal({ cat, entries: catEntries })
+  }
+
+  const handleSaveToLibrary = async () => {
+    if (!saveLibName.trim()) { setSaveLibError('Please enter a name.'); return }
+    setSaveLibSaving(true)
+    setSaveLibError(null)
+    try {
+      const { entries } = saveLibModal
+      const totalCal  = entries.reduce((a, e) => a + e.calories, 0)
+      const totalProt = entries.reduce((a, e) => a + e.protein_g, 0)
+      const totalCarb = entries.reduce((a, e) => a + e.carbs_g, 0)
+      const totalFat  = entries.reduce((a, e) => a + e.fat_g, 0)
+      const ingredients = entries.map(e => e.description)
+      await api.meals.create({
+        user_id:     userId,
+        name:        saveLibName.trim(),
+        meal_type:   saveLibMealType,
+        slot_number: 999,
+        calories:    totalCal,
+        protein_g:   totalProt,
+        carbs_g:     totalCarb,
+        fat_g:       totalFat,
+        ingredients,
+        notes:       '',
+      })
+      setSaveLibModal(null)
+    } catch (e) {
+      setSaveLibError(e.message)
+    } finally {
+      setSaveLibSaving(false)
+    }
   }
 
   // ── Derived state ──
@@ -164,7 +213,7 @@ export default function FoodLog() {
   const entries = log?.food_entries || []
   const byCategory = {}
   for (const e of entries) {
-    const c = e.meal_category || 'breakfast'
+    const c = normCat(e.meal_category || 'breakfast')
     if (!byCategory[c]) byCategory[c] = []
     byCategory[c].push(e)
   }
@@ -273,15 +322,24 @@ export default function FoodLog() {
                     {cat.label}
                   </span>
                   {catEntries.length > 0 && (
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      <span className="macro-protein">{Math.round(catProt)}g</span>
-                      {' · '}
-                      <span className="macro-carbs">{Math.round(catCarbs)}g</span>
-                      {' · '}
-                      <span className="macro-fat">{Math.round(catFat)}g</span>
-                      {' · '}
-                      <span className="macro-cal">{Math.round(catCals)} kcal</span>
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        <span className="macro-protein">{Math.round(catProt)}g</span>
+                        {' · '}
+                        <span className="macro-carbs">{Math.round(catCarbs)}g</span>
+                        {' · '}
+                        <span className="macro-fat">{Math.round(catFat)}g</span>
+                        {' · '}
+                        <span className="macro-cal">{Math.round(catCals)} kcal</span>
+                      </span>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ fontSize: 10, padding: '2px 7px', opacity: 0.7 }}
+                        onClick={() => openSaveLib(cat.key, catEntries)}
+                      >
+                        Save to library
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -517,6 +575,55 @@ export default function FoodLog() {
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setShowLibrary(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save to Library modal */}
+      {saveLibModal && (
+        <div className="modal-overlay" onClick={() => setSaveLibModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Save to Meal Library</div>
+
+            <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--text-secondary)' }}>
+              {saveLibModal.entries.length} item{saveLibModal.entries.length !== 1 ? 's' : ''} will be saved together as one meal.
+            </div>
+
+            <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {saveLibModal.entries.map(e => (
+                <div key={e.id} style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {e.description}</div>
+              ))}
+            </div>
+
+            <div className="form-group mb-16">
+              <label className="form-label">Meal name</label>
+              <input
+                className="form-input"
+                type="text"
+                value={saveLibName}
+                onChange={e => { setSaveLibName(e.target.value); setSaveLibError(null) }}
+                placeholder="e.g. Pre-race Breakfast"
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group mb-16">
+              <label className="form-label">Meal type</label>
+              <select className="form-select" value={saveLibMealType} onChange={e => setSaveLibMealType(e.target.value)}>
+                {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            </div>
+
+            {saveLibError && (
+              <div className="alert alert-danger mb-16" style={{ fontSize: 13 }}>{saveLibError}</div>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-primary" onClick={handleSaveToLibrary} disabled={saveLibSaving}>
+                {saveLibSaving ? 'Saving…' : 'Save to Library'}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setSaveLibModal(null)}>Cancel</button>
             </div>
           </div>
         </div>

@@ -24,6 +24,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=True)
     name = Column(String, nullable=False)
     sex = Column(String, default="male")
     age = Column(Integer)

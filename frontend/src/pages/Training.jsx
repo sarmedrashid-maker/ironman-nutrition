@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import { useUser } from '../contexts/UserContext'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
 export default function Training() {
+  const { userId } = useUser()
   const [uploadDate, setUploadDate] = useState(todayISO())
 
   // TSS state — loaded from the day's log, overridable
@@ -28,7 +30,7 @@ export default function Training() {
   // Load existing TSS and notes for the selected date
   const loadDayData = useCallback(async () => {
     try {
-      const log = await api.foodLog.get(uploadDate)
+      const log = await api.foodLog.get(uploadDate, userId)
       setTssInput(String(log.tss ?? 0))
       setTrainingNotes(log.training_notes || '')
       setTssSource('log')
@@ -37,7 +39,7 @@ export default function Training() {
     } catch {
       // If log doesn't exist yet that's fine — defaults are 0
     }
-  }, [uploadDate])
+  }, [uploadDate, userId])
 
   useEffect(() => { loadDayData() }, [loadDayData])
 
@@ -47,7 +49,7 @@ export default function Training() {
     setSavingTSS(true)
     setTssSaved(false)
     try {
-      await api.foodLog.updateTSS(uploadDate, tss)
+      await api.foodLog.updateTSS(uploadDate, tss, userId)
       setTssSaved(true)
       setTssSource('manual')
       setTimeout(() => setTssSaved(false), 2500)
@@ -64,7 +66,7 @@ export default function Training() {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('log_date', uploadDate)
-    formData.append('user_id', '1')
+    formData.append('user_id', String(userId))
     try {
       const result = await api.training.upload(formData)
       setUploadResult(result)
@@ -84,7 +86,7 @@ export default function Training() {
     setSavingNotes(true)
     setNotesSaved(false)
     try {
-      await api.foodLog.updateTrainingNotes(uploadDate, trainingNotes)
+      await api.foodLog.updateTrainingNotes(uploadDate, trainingNotes, userId)
       setNotesSaved(true)
       setTimeout(() => setNotesSaved(false), 2500)
     } catch {

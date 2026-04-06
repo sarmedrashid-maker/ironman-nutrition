@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import { useUser } from '../contexts/UserContext'
 import MacroRing from '../components/MacroRing'
 import MacroBar from '../components/MacroBar'
 
@@ -15,9 +16,10 @@ const CATEGORY_LABELS = {
   breakfast: 'Breakfast',
   lunch:     'Lunch',
   dinner:    'Dinner',
-  snack_1:   'Snack 1',
-  snack_2:   'Snack 2',
-  snack_3:   'Snack 3',
+  snack:     'Snack',
+  snack_1:   'Snack',
+  snack_2:   'Snack',
+  snack_3:   'Snack',
 }
 
 const TSS_LABEL = (tss) =>
@@ -28,6 +30,7 @@ const TSS_LABEL = (tss) =>
                { text: 'Very Hard',cls: 'badge-danger' }
 
 export default function Dashboard() {
+  const { userId } = useUser()
   const [log, setLog] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -39,7 +42,7 @@ export default function Dashboard() {
     setDate(d.toISOString().slice(0, 10))
   }
 
-  const loadLog = useCallback(() => api.foodLog.get(date).then(setLog), [date])
+  const loadLog = useCallback(() => api.foodLog.get(date, userId).then(setLog), [date, userId])
 
   useEffect(() => {
     loadLog().catch(e => setError(e.message)).finally(() => setLoading(false))
@@ -60,13 +63,14 @@ export default function Dashboard() {
   const tssInfo = TSS_LABEL(log.tss)
 
   // Group entries by category for the log panel
+  const normCat = (cat) => (cat === 'snack_1' || cat === 'snack_2' || cat === 'snack_3') ? 'snack' : cat
   const byCategory = {}
   for (const e of entries) {
-    const cat = e.meal_category || 'breakfast'
+    const cat = normCat(e.meal_category || 'breakfast')
     if (!byCategory[cat]) byCategory[cat] = []
     byCategory[cat].push(e)
   }
-  const populatedCats = ['breakfast','lunch','dinner','snack_1','snack_2','snack_3']
+  const populatedCats = ['breakfast','lunch','dinner','snack']
     .filter(c => byCategory[c]?.length > 0)
 
   return (

@@ -17,6 +17,7 @@ def migrate_db():
     """Add columns introduced after initial schema creation. Safe to re-run."""
     migrations = [
         "ALTER TABLE users ADD COLUMN nutrition_settings TEXT DEFAULT '{}'",
+        "ALTER TABLE users ADD COLUMN username TEXT",
         "ALTER TABLE daily_logs ADD COLUMN training_notes TEXT DEFAULT ''",
         "ALTER TABLE food_entries ADD COLUMN meal_category TEXT DEFAULT 'breakfast'",
         "ALTER TABLE food_entries ADD COLUMN servings REAL DEFAULT 1.0",

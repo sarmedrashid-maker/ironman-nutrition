@@ -4,6 +4,7 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { api } from '../api'
+import { useUser } from '../contexts/UserContext'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -106,6 +107,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Progress() {
+  const { userId } = useUser()
   const [entries, setEntries] = useState([])
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -120,7 +122,7 @@ export default function Progress() {
   const [saveMsg, setSaveMsg] = useState(null)
 
   const loadAll = () =>
-    Promise.all([api.progress.list(), api.users.get(1)]).then(([data, u]) => {
+    Promise.all([api.progress.list(userId), api.users.get(userId)]).then(([data, u]) => {
       setEntries([...data].reverse())
       setUser(u)
     })
@@ -136,7 +138,7 @@ export default function Progress() {
     setSaveMsg(null)
     try {
       await api.progress.add({
-        user_id: 1,
+        user_id: userId,
         entry_date: form.entry_date,
         weight_lbs: form.weight_lbs ? parseFloat(form.weight_lbs) : null,
         navel_circumference_inches: form.navel_circumference_inches

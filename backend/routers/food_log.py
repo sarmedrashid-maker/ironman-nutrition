@@ -18,7 +18,7 @@ MEAL_TYPE_TO_CATEGORY = {
     "breakfast": "breakfast",
     "lunch":     "lunch",
     "dinner":    "dinner",
-    "snack":     "snack_1",
+    "snack":     "snack",
 }
 
 

@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useUser } from '../contexts/UserContext'
 
 const links = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -10,6 +11,14 @@ const links = [
 ]
 
 export default function Nav() {
+  const { username, logout } = useUser()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <nav className="nav">
       <span className="nav-brand">IRONMAN NUTRITION</span>
@@ -23,6 +32,20 @@ export default function Nav() {
             {label}
           </NavLink>
         ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {username && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+            {username}
+          </span>
+        )}
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={handleLogout}
+          style={{ fontSize: 12 }}
+        >
+          Log out
+        </button>
       </div>
     </nav>
   )

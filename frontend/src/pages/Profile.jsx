@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { useUser } from '../contexts/UserContext'
 
 const RESTRICTION_OPTIONS = [
   { value: 'no_mammal_meat', label: 'No mammal meat (beef, pork, lamb, etc.)' },
@@ -67,6 +68,7 @@ function previewTargets(form, ns, tss = 0) {
 }
 
 export default function Profile() {
+  const { userId, username } = useUser()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -86,7 +88,7 @@ export default function Profile() {
   })
 
   useEffect(() => {
-    api.users.get(1)
+    api.users.get(userId)
       .then(u => {
         setUser(u)
         setForm({
@@ -125,7 +127,7 @@ export default function Profile() {
   const handleSave = async () => {
     setSaving(true); setSaved(false); setError(null)
     try {
-      const updated = await api.users.update(1, {
+      const updated = await api.users.update(userId, {
         name: form.name,
         sex: form.sex,
         age: parseInt(form.age, 10),
@@ -188,6 +190,12 @@ export default function Profile() {
           <div className="card">
             <div className="card-title">Personal Information</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">Username</label>
+                <div style={{ fontSize: 14, color: 'var(--text-primary)', padding: '8px 12px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  {username}
+                </div>
+              </div>
               <div className="form-group">
                 <label className="form-label">Name</label>
                 <input className="form-input" value={form.name}

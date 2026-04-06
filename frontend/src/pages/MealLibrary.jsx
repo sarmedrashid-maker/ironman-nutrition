@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { useUser } from '../contexts/UserContext'
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -14,6 +15,7 @@ const emptyForm = (mealType = 'breakfast') => ({
 })
 
 export default function MealLibrary() {
+  const { userId } = useUser()
   const [meals, setMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('breakfast')
@@ -26,7 +28,7 @@ export default function MealLibrary() {
   const [addingToLog, setAddingToLog] = useState(null)
 
   useEffect(() => {
-    api.meals.list().then(setMeals).finally(() => setLoading(false))
+    api.meals.list(userId).then(setMeals).finally(() => setLoading(false))
   }, [])
 
   const visibleMeals = meals.filter(m => m.meal_type === activeTab)
@@ -73,7 +75,7 @@ export default function MealLibrary() {
       fat_g:       parseFloat(form.fat_g) || 0,
       ingredients: form.ingredients.split('\n').map(s => s.trim()).filter(Boolean),
       notes:       form.notes,
-      user_id:     1,
+      user_id:     userId,
     }
 
     try {
@@ -82,7 +84,7 @@ export default function MealLibrary() {
       } else {
         await api.meals.create(payload)
       }
-      const updated = await api.meals.list()
+      const updated = await api.meals.list(userId)
       setMeals(updated)
       setModal(null)
     } catch (e) {
@@ -101,8 +103,8 @@ export default function MealLibrary() {
   const handleAddToLog = async (meal) => {
     setAddingToLog(meal.id)
     try {
-      const MEAL_TYPE_TO_CAT = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack_1' }
-      await api.foodLog.addMealToLog(meal.id, todayISO(), MEAL_TYPE_TO_CAT[meal.meal_type] || 'snack_1')
+      const MEAL_TYPE_TO_CAT = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack' }
+      await api.foodLog.addMealToLog(meal.id, todayISO(), MEAL_TYPE_TO_CAT[meal.meal_type] || 'snack_1', userId)
       alert(`"${meal.name}" added to today's log!`)
     } catch (e) {
       alert('Error: ' + e.message)

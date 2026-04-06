@@ -24,6 +24,10 @@ class NutritionSettings(BaseModel):
 
 # ── User ──────────────────────────────────────────────────────────────────────
 
+class UserRegister(BaseModel):
+    username: str
+
+
 class UserBase(BaseModel):
     name: str
     sex: str = "male"
@@ -52,6 +56,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
+    username: Optional[str]
     name: str
     sex: str
     age: int

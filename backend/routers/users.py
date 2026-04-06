@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from schemas import UserCreate, UserUpdate, UserResponse, NutritionSettings
+from schemas import UserCreate, UserUpdate, UserResponse, UserRegister, NutritionSettings
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -12,6 +12,36 @@ def _enrich(user: User) -> User:
     user.dietary_restrictions = user.get_restrictions()
     user.nutrition_settings = user.get_nutrition_settings()
     return user
+
+
+@router.get("/by-username/{username}", response_model=UserResponse)
+def get_user_by_username(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _enrich(user)
+
+
+@router.post("/register", response_model=UserResponse)
+def register_user(payload: UserRegister, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.username == payload.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    user = User(
+        username=payload.username,
+        name=payload.username,
+        sex="male",
+        age=30,
+        weight_lbs=175.0,
+        goal_weight_lbs=160.0,
+        height_inches=70.0,
+    )
+    user.set_restrictions([])
+    user.set_nutrition_settings({})
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _enrich(user)
 
 
 @router.get("/{user_id}", response_model=UserResponse)
