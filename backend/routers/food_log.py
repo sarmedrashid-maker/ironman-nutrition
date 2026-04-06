@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, DailyLog, FoodEntry, Meal
 from schemas import (
-    DailyLogResponse, FoodEntryCreate, FoodEntryResponse,
+    DailyLogResponse, FoodEntryCreate, FoodEntryUpdate, FoodEntryResponse,
     FoodParseRequest, FoodParseResponse, TSSUpdate,
     InstructionsUpdate, TrainingNotesUpdate,
     EatingOutRequest, EatingOutResponse,
@@ -149,11 +149,32 @@ def add_food_entry(payload: FoodEntryCreate, db: Session = Depends(get_db)):
         protein_g=payload.protein_g,
         carbs_g=payload.carbs_g,
         fat_g=payload.fat_g,
+        servings=payload.servings,
         has_mammal=payload.has_mammal,
         source=payload.source,
         raw_input=payload.raw_input,
     )
     db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+@router.put("/entry/{entry_id}/servings", response_model=FoodEntryResponse)
+def update_entry_servings(entry_id: int, payload: FoodEntryUpdate, db: Session = Depends(get_db)):
+    entry = db.query(FoodEntry).filter(FoodEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if payload.servings <= 0:
+        raise HTTPException(status_code=422, detail="Servings must be greater than 0")
+    # Recalculate macros: base = current / old_servings, new total = base * new_servings
+    old = entry.servings or 1.0
+    ratio = payload.servings / old
+    entry.calories  *= ratio
+    entry.protein_g *= ratio
+    entry.carbs_g   *= ratio
+    entry.fat_g     *= ratio
+    entry.servings   = payload.servings
     db.commit()
     db.refresh(entry)
     return entry

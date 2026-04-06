@@ -118,6 +118,7 @@ class FoodEntry(Base):
     protein_g = Column(Float, default=0)
     carbs_g = Column(Float, default=0)
     fat_g = Column(Float, default=0)
+    servings = Column(Float, default=1.0)
     has_mammal = Column(Boolean, default=False)
     source = Column(String, default="manual")
     raw_input = Column(Text, default="")

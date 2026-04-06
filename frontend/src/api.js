@@ -46,6 +46,7 @@ export const api = {
       put(`/food-log/${date}/training-notes?user_id=${userId}`, { notes }),
     parse: (text, userId = 1) => post('/food-log/parse', { text, user_id: userId }),
     addEntry: (data) => post('/food-log/entry', data),
+    updateServings: (id, servings) => put(`/food-log/entry/${id}/servings`, { servings }),
     deleteEntry: (id) => del(`/food-log/entry/${id}`),
     addMealToLog: (mealId, date, category, userId = 1) =>
       post(`/food-log/add-meal/${mealId}?log_date=${date}&meal_category=${category}&user_id=${userId}`),

@@ -31,7 +31,7 @@ export default function FoodLog() {
   const [error, setError] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayISO())
 
-  // Per-section NLP state: { breakfast: {input, parsing, preview, error}, ... }
+  // Per-section NLP state: { breakfast: {input, parsing, preview, previewServings, error}, ... }
   const [sections, setSections] = useState({})
 
   // Library modal
@@ -83,17 +83,20 @@ export default function FoodLog() {
   }
 
   const handleConfirm = async (cat) => {
-    const { preview, input } = getSection(cat)
+    const { preview, previewServings = {}, input } = getSection(cat)
     if (!preview || !log) return
-    for (const item of preview.items) {
+    for (let i = 0; i < preview.items.length; i++) {
+      const item = preview.items[i]
+      const srv = parseFloat(previewServings[i]) || 1
       await api.foodLog.addEntry({
         daily_log_id:  log.id,
         meal_category: cat,
         description:   `${item.name} (${item.amount})`,
-        calories:      item.calories,
-        protein_g:     item.protein_g,
-        carbs_g:       item.carbs_g,
-        fat_g:         item.fat_g,
+        calories:      item.calories * srv,
+        protein_g:     item.protein_g * srv,
+        carbs_g:       item.carbs_g * srv,
+        fat_g:         item.fat_g * srv,
+        servings:      srv,
         has_mammal:    item.has_mammal,
         source:        'nlp',
         raw_input:     input,
@@ -124,6 +127,20 @@ export default function FoodLog() {
     }
     setShowLibrary(false)
     setLibServings({})
+    await loadLog()
+  }
+
+  // ── Edit servings on logged entry ──
+  const [editingServings, setEditingServings] = useState({}) // { [entryId]: servingsString }
+
+  const handleServingsChange = (id, val) =>
+    setEditingServings(s => ({ ...s, [id]: val }))
+
+  const handleServingsSave = async (entry) => {
+    const val = parseFloat(editingServings[entry.id])
+    if (!val || val <= 0) return
+    await api.foodLog.updateServings(entry.id, val)
+    setEditingServings(s => { const n = { ...s }; delete n[entry.id]; return n })
     await loadLog()
   }
 
@@ -271,31 +288,58 @@ export default function FoodLog() {
                 {/* Logged entries */}
                 {catEntries.length > 0 && (
                   <div style={{ padding: '4px 16px' }}>
-                    {catEntries.map(e => (
-                      <div key={e.id} className="food-entry">
-                        <div className="food-entry-info">
-                          <div className="food-entry-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            {e.description}
-                            {e.has_mammal && <span className="badge badge-danger">Mammal</span>}
+                    {catEntries.map(e => {
+                      const isEditing = editingServings[e.id] !== undefined
+                      return (
+                        <div key={e.id} className="food-entry">
+                          <div className="food-entry-info">
+                            <div className="food-entry-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {e.description}
+                              {e.has_mammal && <span className="badge badge-danger">Mammal</span>}
+                            </div>
+                            <div className="food-entry-macros" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span className="macro-protein">{Math.round(e.protein_g)}g P</span>
+                              {' · '}
+                              <span className="macro-carbs">{Math.round(e.carbs_g)}g C</span>
+                              {' · '}
+                              <span className="macro-fat">{Math.round(e.fat_g)}g F</span>
+                              {!isEditing && (
+                                <span
+                                  style={{ marginLeft: 4, cursor: 'pointer', opacity: 0.5, fontSize: 11 }}
+                                  onClick={() => handleServingsChange(e.id, String(e.servings || 1))}
+                                >
+                                  {e.servings && e.servings !== 1 ? `${e.servings}×` : ''} ✎
+                                </span>
+                              )}
+                              {isEditing && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <input
+                                    type="number" min="0.5" step="0.5" autoFocus
+                                    value={editingServings[e.id]}
+                                    onChange={ev => handleServingsChange(e.id, ev.target.value)}
+                                    onKeyDown={ev => { if (ev.key === 'Enter') handleServingsSave(e); if (ev.key === 'Escape') setEditingServings(s => { const n={...s}; delete n[e.id]; return n }) }}
+                                    style={{ width: 48, fontSize: 12, padding: '2px 4px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }}
+                                  />
+                                  <span className="text-muted" style={{ fontSize: 11 }}>srv</span>
+                                  <button className="btn btn-primary btn-sm" style={{ padding: '2px 7px', fontSize: 11 }} onClick={() => handleServingsSave(e)}>✓</button>
+                                  <button className="btn btn-ghost btn-sm" style={{ padding: '2px 5px', fontSize: 11 }} onClick={() => setEditingServings(s => { const n={...s}; delete n[e.id]; return n })}>✕</button>
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="food-entry-macros">
-                            <span className="macro-protein">{Math.round(e.protein_g)}g P</span>
-                            {' · '}
-                            <span className="macro-carbs">{Math.round(e.carbs_g)}g C</span>
-                            {' · '}
-                            <span className="macro-fat">{Math.round(e.fat_g)}g F</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="food-entry-cal">{Math.round(e.calories)} kcal</span>
+                            {!isEditing && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => handleDeleteEntry(e.id)}
+                                style={{ padding: '2px 7px', fontSize: 11, opacity: 0.6 }}
+                              >✕</button>
+                            )}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span className="food-entry-cal">{Math.round(e.calories)} kcal</span>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => handleDeleteEntry(e.id)}
-                            style={{ padding: '2px 7px', fontSize: 11, opacity: 0.6 }}
-                          >✕</button>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
 
@@ -312,37 +356,65 @@ export default function FoodLog() {
                       </div>
                     )}
 
-                    {sec.preview.items.map((item, i) => (
-                      <div key={i} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                        padding: '5px 0', borderBottom: i < sec.preview.items.length - 1 ? '1px solid var(--border)' : 'none',
-                      }}>
-                        <div>
-                          <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
-                          <span className="text-muted" style={{ fontSize: 12, marginLeft: 6 }}>({item.amount})</span>
-                          {item.has_mammal && <span className="badge badge-danger" style={{ marginLeft: 6 }}>Mammal</span>}
-                          <div className="food-entry-macros" style={{ marginTop: 1 }}>
-                            <span className="macro-protein">{item.protein_g}g P</span>
-                            {' · '}
-                            <span className="macro-carbs">{item.carbs_g}g C</span>
-                            {' · '}
-                            <span className="macro-fat">{item.fat_g}g F</span>
+                    {sec.preview.items.map((item, i) => {
+                      const srv = parseFloat((sec.previewServings || {})[i]) || 1
+                      return (
+                        <div key={i} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '5px 0', borderBottom: i < sec.preview.items.length - 1 ? '1px solid var(--border)' : 'none',
+                          gap: 8,
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
+                            <span className="text-muted" style={{ fontSize: 12, marginLeft: 6 }}>({item.amount})</span>
+                            {item.has_mammal && <span className="badge badge-danger" style={{ marginLeft: 6 }}>Mammal</span>}
+                            <div className="food-entry-macros" style={{ marginTop: 1 }}>
+                              <span className="macro-protein">{Math.round(item.protein_g * srv)}g P</span>
+                              {' · '}
+                              <span className="macro-carbs">{Math.round(item.carbs_g * srv)}g C</span>
+                              {' · '}
+                              <span className="macro-fat">{Math.round(item.fat_g * srv)}g F</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                            <input
+                              type="number" min="0.5" step="0.5"
+                              value={(sec.previewServings || {})[i] ?? 1}
+                              onChange={e => updateSection(cat.key, {
+                                previewServings: { ...(sec.previewServings || {}), [i]: e.target.value }
+                              })}
+                              style={{ width: 48, fontSize: 12, padding: '2px 4px', textAlign: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }}
+                            />
+                            <span className="text-muted" style={{ fontSize: 11 }}>srv</span>
+                            <span className="food-entry-cal" style={{ flexShrink: 0, minWidth: 64, textAlign: 'right' }}>{Math.round(item.calories * srv)} kcal</span>
                           </div>
                         </div>
-                        <span className="food-entry-cal" style={{ flexShrink: 0 }}>{Math.round(item.calories)} kcal</span>
-                      </div>
-                    ))}
+                      )
+                    })}
 
-                    {/* Preview totals */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 4px', fontSize: 13, fontWeight: 600 }}>
-                      <span className="text-muted">Total</span>
-                      <div style={{ display: 'flex', gap: 14 }}>
-                        <span className="macro-protein">{sec.preview.total_protein_g}g</span>
-                        <span className="macro-carbs">{sec.preview.total_carbs_g}g</span>
-                        <span className="macro-fat">{sec.preview.total_fat_g}g</span>
-                        <span className="macro-cal">{Math.round(sec.preview.total_calories)} kcal</span>
-                      </div>
-                    </div>
+                    {/* Preview totals — adjusted for servings */}
+                    {(() => {
+                      const totals = sec.preview.items.reduce((acc, item, i) => {
+                        const srv = parseFloat((sec.previewServings || {})[i]) || 1
+                        return {
+                          cal:  acc.cal  + item.calories  * srv,
+                          prot: acc.prot + item.protein_g * srv,
+                          carb: acc.carb + item.carbs_g   * srv,
+                          fat:  acc.fat  + item.fat_g     * srv,
+                        }
+                      }, { cal: 0, prot: 0, carb: 0, fat: 0 })
+                      return (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 4px', fontSize: 13, fontWeight: 600 }}>
+                          <span className="text-muted">Total</span>
+                          <div style={{ display: 'flex', gap: 14 }}>
+                            <span className="macro-protein">{Math.round(totals.prot)}g</span>
+                            <span className="macro-carbs">{Math.round(totals.carb)}g</span>
+                            <span className="macro-fat">{Math.round(totals.fat)}g</span>
+                            <span className="macro-cal">{Math.round(totals.cal)} kcal</span>
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                     <div className="flex gap-8" style={{ marginTop: 10 }}>
                       <button className="btn btn-primary btn-sm" onClick={() => handleConfirm(cat.key)}>

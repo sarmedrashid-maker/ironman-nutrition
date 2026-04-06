@@ -19,6 +19,7 @@ def migrate_db():
         "ALTER TABLE users ADD COLUMN nutrition_settings TEXT DEFAULT '{}'",
         "ALTER TABLE daily_logs ADD COLUMN training_notes TEXT DEFAULT ''",
         "ALTER TABLE food_entries ADD COLUMN meal_category TEXT DEFAULT 'breakfast'",
+        "ALTER TABLE food_entries ADD COLUMN servings REAL DEFAULT 1.0",
     ]
     with engine.connect() as conn:
         for sql in migrations:

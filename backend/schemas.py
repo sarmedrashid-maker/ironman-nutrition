@@ -111,9 +111,14 @@ class FoodEntryCreate(BaseModel):
     protein_g: float
     carbs_g: float
     fat_g: float
+    servings: float = 1.0
     has_mammal: bool = False
     source: str = "manual"
     raw_input: str = ""
+
+
+class FoodEntryUpdate(BaseModel):
+    servings: float
 
 
 class FoodEntryResponse(BaseModel):
@@ -125,6 +130,7 @@ class FoodEntryResponse(BaseModel):
     protein_g: float
     carbs_g: float
     fat_g: float
+    servings: float
     has_mammal: bool
     source: str
     raw_input: str
