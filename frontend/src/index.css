@@ -1,38 +1,38 @@
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --bg-base:        #0b0c10;
-  --bg-surface:     #13141a;
-  --bg-card:        #1a1c24;
-  --bg-card-hover:  #20222d;
-  --bg-input:       #1f2130;
-  --border:         #2a2d3e;
-  --border-focus:   #4a9eff;
+  --bg-base:        #f5f3ee;
+  --bg-surface:     #edeae3;
+  --bg-card:        #faf9f6;
+  --bg-card-hover:  #f2f0eb;
+  --bg-input:       #ece9e2;
+  --border:         #d8d4cc;
+  --border-focus:   #2e7dd1;
 
-  --text-primary:   #e8eaf2;
-  --text-secondary: #a0a8c0;
-  --text-muted:     #787f9a;
+  --text-primary:   #1e1f2b;
+  --text-secondary: #4e5168;
+  --text-muted:     #80839a;
 
-  --accent:         #00c8ff;
-  --accent-dim:     rgba(0, 200, 255, 0.12);
-  --accent-hover:   #33d4ff;
+  --accent:         #2e7dd1;
+  --accent-dim:     rgba(46, 125, 209, 0.10);
+  --accent-hover:   #1a6abf;
 
-  --protein-color:  #4ade80;   /* green */
-  --carbs-color:    #facc15;   /* yellow */
-  --fat-color:      #fb923c;   /* orange */
-  --cal-color:      #00c8ff;   /* cyan */
+  --protein-color:  #2a9d5c;   /* green */
+  --carbs-color:    #c4830a;   /* amber */
+  --fat-color:      #c05621;   /* burnt orange */
+  --cal-color:      #2e7dd1;   /* blue */
 
-  --danger:         #f87171;
-  --danger-dim:     rgba(248, 113, 113, 0.12);
-  --success:        #4ade80;
-  --warning:        #facc15;
-  --warning-dim:    rgba(250, 204, 21, 0.12);
+  --danger:         #c0392b;
+  --danger-dim:     rgba(192, 57, 43, 0.10);
+  --success:        #2a9d5c;
+  --warning:        #c4830a;
+  --warning-dim:    rgba(196, 131, 10, 0.10);
 
   --radius-sm:      6px;
   --radius:         10px;
   --radius-lg:      16px;
 
   --font: 'Inter', system-ui, -apple-system, sans-serif;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow: 0 4px 24px rgba(0,0,0,0.10);
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
@@ -151,7 +151,7 @@ input, textarea, select { font-family: inherit; }
 
 .btn-primary {
   background: var(--accent);
-  color: #000;
+  color: #fff;
 }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 
