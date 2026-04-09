@@ -1,13 +1,32 @@
 from datetime import date
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, DailyLog
 from schemas import TrainingUploadResponse
-from services import fit_parser, nutrition_calc
+from services import fit_parser, nutrition_calc, claude_service
 from routers.food_log import get_or_create_daily_log
 
 router = APIRouter(prefix="/training", tags=["training"])
+
+
+class TSSEstimateRequest(BaseModel):
+    notes: str
+
+
+@router.post("/estimate-tss")
+async def estimate_tss(payload: TSSEstimateRequest):
+    """Use Claude to estimate TSS from a plain-language training description."""
+    if not payload.notes.strip():
+        raise HTTPException(status_code=422, detail="Notes cannot be empty")
+    try:
+        result = await claude_service.estimate_tss_from_notes(payload.notes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Claude API error: {str(e)}")
+    return result
 
 
 @router.post("/upload", response_model=TrainingUploadResponse)

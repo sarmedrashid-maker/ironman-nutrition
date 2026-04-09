@@ -57,6 +57,7 @@ export const api = {
 
   training: {
     upload: (formData) => postForm('/training/upload', formData),
+    estimateTSS: (notes) => post('/training/estimate-tss', { notes }),
   },
 
   progress: {

@@ -25,7 +25,7 @@ export default function Login() {
         user = await api.users.register(trimmed)
       }
       login(user.id, user.username)
-      navigate('/dashboard', { replace: true })
+      navigate('/calendar', { replace: true })
     } catch (e) {
       setError(e.message)
     } finally {

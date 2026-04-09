@@ -4,12 +4,10 @@ import { useUser } from '../contexts/UserContext'
 import MacroRing from '../components/MacroRing'
 import MacroBar from '../components/MacroBar'
 
-// EST-aware today
 function todayEST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
-// Safe date arithmetic — avoids toISOString()/UTC issues
 function dateShift(isoStr, n) {
   const [y, m, d] = isoStr.split('-').map(Number)
   const dt = new Date(y, m - 1, d + n)
@@ -24,7 +22,7 @@ const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
 ]
-const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const DAYS_SHORT = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
 const CATEGORIES = [
   { key: 'breakfast', label: 'Breakfast', placeholder: 'e.g. "a bowl of oatmeal with blueberries and a coffee"' },
@@ -50,9 +48,9 @@ export default function CalendarView() {
   const today = todayEST()
   const [ty, tm] = today.split('-').map(Number)
 
-  // Calendar navigation (month/year shown in grid)
+  // Calendar navigation
   const [viewYear,  setViewYear]  = useState(ty)
-  const [viewMonth, setViewMonth] = useState(tm) // 1–12
+  const [viewMonth, setViewMonth] = useState(tm)
 
   // Selected date
   const [selectedDate, setSelectedDate] = useState(today)
@@ -63,47 +61,50 @@ export default function CalendarView() {
   const [logError,   setLogError]   = useState(null)
 
   // Training state
-  const [tssInput,      setTssInput]      = useState('0')
-  const [tssSource,     setTssSource]     = useState(null)
-  const [savingTSS,     setSavingTSS]     = useState(false)
-  const [tssSaved,      setTssSaved]      = useState(false)
-  const [trainingNotes, setTrainingNotes] = useState('')
-  const [savingNotes,   setSavingNotes]   = useState(false)
-  const [notesSaved,    setNotesSaved]    = useState(false)
-  const [file,          setFile]          = useState(null)
-  const [uploading,     setUploading]     = useState(false)
-  const [uploadResult,  setUploadResult]  = useState(null)
-  const [uploadError,   setUploadError]   = useState(null)
+  const [tssInput,        setTssInput]        = useState('0')
+  const [tssSource,       setTssSource]       = useState(null)
+  const [tssReasoning,    setTssReasoning]    = useState('')
+  const [estimatingTSS,   setEstimatingTSS]   = useState(false)
+  const [tssEstimateError,setTssEstimateError]= useState(null)
+  const [savingTSS,       setSavingTSS]       = useState(false)
+  const [tssSaved,        setTssSaved]        = useState(false)
+  const [trainingNotes,   setTrainingNotes]   = useState('')
+  const [savingNotes,     setSavingNotes]     = useState(false)
+  const [notesSaved,      setNotesSaved]      = useState(false)
+  const [file,            setFile]            = useState(null)
+  const [uploading,       setUploading]       = useState(false)
+  const [uploadResult,    setUploadResult]    = useState(null)
+  const [uploadError,     setUploadError]     = useState(null)
 
   // Food state
-  const [sections,       setSections]       = useState({})
-  const [meals,          setMeals]          = useState([])
-  const [showLibrary,    setShowLibrary]    = useState(false)
-  const [libTargetCat,   setLibTargetCat]   = useState('breakfast')
-  const [libServings,    setLibServings]    = useState({})
-  const [editingServings,setEditingServings]= useState({})
-  const [saveLibModal,   setSaveLibModal]   = useState(null)
-  const [saveLibName,    setSaveLibName]    = useState('')
-  const [saveLibMealType,setSaveLibMealType]= useState('breakfast')
-  const [saveLibSaving,  setSaveLibSaving]  = useState(false)
-  const [saveLibError,   setSaveLibError]   = useState(null)
+  const [sections,        setSections]        = useState({})
+  const [meals,           setMeals]           = useState([])
+  const [showLibrary,     setShowLibrary]     = useState(false)
+  const [libTargetCat,    setLibTargetCat]    = useState('breakfast')
+  const [libServings,     setLibServings]     = useState({})
+  const [editingServings, setEditingServings] = useState({})
+  const [saveLibModal,    setSaveLibModal]    = useState(null)
+  const [saveLibName,     setSaveLibName]     = useState('')
+  const [saveLibMealType, setSaveLibMealType] = useState('breakfast')
+  const [saveLibSaving,   setSaveLibSaving]   = useState(false)
+  const [saveLibError,    setSaveLibError]    = useState(null)
 
   // Day notes
   const [instructions,       setInstructions]       = useState('')
   const [savingInstructions, setSavingInstructions] = useState(false)
 
-  // Restaurant meal
-  const [restaurantInput,   setRestaurantInput]   = useState('')
-  const [restaurantLoading, setRestaurantLoading] = useState(false)
-  const [restaurantResult,  setRestaurantResult]  = useState(null)
-  const [restaurantError,   setRestaurantError]   = useState(null)
+  // Plan the rest of the day
+  const [planInput,   setPlanInput]   = useState('')
+  const [planLoading, setPlanLoading] = useState(false)
+  const [planResult,  setPlanResult]  = useState(null)
+  const [planError,   setPlanError]   = useState(null)
 
-  // ── Load meals once ──
+  // ── Meals (once per user) ──
   useEffect(() => {
     api.meals.list(userId).then(setMeals).catch(() => {})
   }, [userId])
 
-  // ── Load full log + reset all day state when date changes ──
+  // ── Full log load when date changes ──
   const loadLog = useCallback(async () => {
     setLoadingLog(true)
     setLogError(null)
@@ -113,13 +114,15 @@ export default function CalendarView() {
       setTssInput(String(l.tss ?? 0))
       setTrainingNotes(l.training_notes || '')
       setInstructions(l.special_instructions || '')
-      setTssSource('log')
+      setTssSource(null)
+      setTssReasoning('')
+      setTssEstimateError(null)
       setSections({})
       setEditingServings({})
       setUploadResult(null)
       setUploadError(null)
-      setRestaurantResult(null)
-      setRestaurantError(null)
+      setPlanResult(null)
+      setPlanError(null)
     } catch (e) {
       setLogError(e.message)
     } finally {
@@ -129,7 +132,7 @@ export default function CalendarView() {
 
   useEffect(() => { loadLog() }, [loadLog])
 
-  // ── Reload only log object (after food entry changes, TSS save) ──
+  // ── Light reload after food/TSS changes ──
   const reloadLog = useCallback(async () => {
     try {
       const l = await api.foodLog.get(selectedDate, userId)
@@ -137,7 +140,7 @@ export default function CalendarView() {
     } catch (e) {}
   }, [selectedDate, userId])
 
-  // ── Calendar navigation ──
+  // ── Calendar ──
   const prevMonth = () => {
     if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12) }
     else setViewMonth(m => m - 1)
@@ -148,16 +151,31 @@ export default function CalendarView() {
   }
 
   const handleSelectDate = (dateStr) => {
-    if (dateStr > today) return // block future dates
+    if (dateStr > today) return
     setSelectedDate(dateStr)
     const [y, m] = dateStr.split('-').map(Number)
     setViewYear(y)
     setViewMonth(m)
   }
 
-  const goToToday = () => handleSelectDate(todayEST())
+  // ── Training ──
+  const handleEstimateTSS = async () => {
+    if (!trainingNotes.trim()) return
+    setEstimatingTSS(true)
+    setTssEstimateError(null)
+    setTssReasoning('')
+    try {
+      const result = await api.training.estimateTSS(trainingNotes)
+      setTssInput(String(result.tss))
+      setTssReasoning(result.reasoning || '')
+      setTssSource('estimate')
+    } catch (e) {
+      setTssEstimateError(e.message)
+    } finally {
+      setEstimatingTSS(false)
+    }
+  }
 
-  // ── Training handlers ──
   const handleSaveTSS = async () => {
     const tss = parseInt(tssInput, 10)
     if (isNaN(tss) || tss < 0) return
@@ -166,7 +184,7 @@ export default function CalendarView() {
     try {
       await api.foodLog.updateTSS(selectedDate, tss, userId)
       setTssSaved(true)
-      setTssSource('manual')
+      setTssSource('saved')
       setTimeout(() => setTssSaved(false), 2500)
       await reloadLog()
     } finally {
@@ -189,6 +207,7 @@ export default function CalendarView() {
       if (result.tss !== null) {
         setTssInput(String(Math.round(result.tss)))
         setTssSource('file')
+        setTssReasoning('')
       }
     } catch (e) {
       setUploadError(e.message)
@@ -204,9 +223,7 @@ export default function CalendarView() {
       await api.foodLog.updateTrainingNotes(selectedDate, trainingNotes, userId)
       setNotesSaved(true)
       setTimeout(() => setNotesSaved(false), 2500)
-    } catch (e) {
-      // non-critical
-    } finally {
+    } catch (e) {} finally {
       setSavingNotes(false)
     }
   }
@@ -220,11 +237,11 @@ export default function CalendarView() {
     }
   }
 
-  // ── Food handlers ──
-  const getSection   = (cat) => sections[cat] || emptySection()
+  // ── Food ──
+  const getSection    = (cat) => sections[cat] || emptySection()
   const updateSection = (cat, updates) =>
     setSections(s => ({ ...s, [cat]: { ...getSection(cat), ...updates } }))
-  const clearSection = (cat) =>
+  const clearSection  = (cat) =>
     setSections(s => ({ ...s, [cat]: emptySection() }))
 
   const handleParse = async (cat) => {
@@ -320,10 +337,10 @@ export default function CalendarView() {
         name:        saveLibName.trim(),
         meal_type:   saveLibMealType,
         slot_number: 999,
-        calories:    entries.reduce((a, e) => a + e.calories, 0),
+        calories:    entries.reduce((a, e) => a + e.calories,  0),
         protein_g:   entries.reduce((a, e) => a + e.protein_g, 0),
-        carbs_g:     entries.reduce((a, e) => a + e.carbs_g, 0),
-        fat_g:       entries.reduce((a, e) => a + e.fat_g, 0),
+        carbs_g:     entries.reduce((a, e) => a + e.carbs_g,   0),
+        fat_g:       entries.reduce((a, e) => a + e.fat_g,     0),
         ingredients: entries.map(e => e.description),
         notes:       '',
       })
@@ -335,22 +352,22 @@ export default function CalendarView() {
     }
   }
 
-  const handleRestaurantEstimate = async () => {
-    if (!restaurantInput.trim()) return
-    setRestaurantLoading(true)
-    setRestaurantError(null)
-    setRestaurantResult(null)
+  const handlePlanRest = async () => {
+    if (!planInput.trim()) return
+    setPlanLoading(true)
+    setPlanError(null)
+    setPlanResult(null)
     try {
       const result = await api.foodLog.restaurantEstimate({
-        description: restaurantInput,
+        description: planInput,
         user_id:     userId,
         log_date:    selectedDate,
       })
-      setRestaurantResult(result)
+      setPlanResult(result)
     } catch (e) {
-      setRestaurantError(e.message)
+      setPlanError(e.message)
     } finally {
-      setRestaurantLoading(false)
+      setPlanLoading(false)
     }
   }
 
@@ -368,12 +385,11 @@ export default function CalendarView() {
     carbs_g:   entries.reduce((a, e) => a + e.carbs_g,   0),
     fat_g:     entries.reduce((a, e) => a + e.fat_g,     0),
   }
-  const mammalWarning = entries.some(e => e.has_mammal)
   const tssNum  = parseInt(tssInput, 10) || 0
   const tssInfo = TSS_LABEL(tssNum)
 
   // ── Calendar grid ──
-  const firstDayOfMonth = new Date(viewYear, viewMonth - 1, 1).getDay() // 0=Sun
+  const firstDayOfMonth = new Date(viewYear, viewMonth - 1, 1).getDay()
   const daysInMonth     = new Date(viewYear, viewMonth, 0).getDate()
   const calCells = []
   for (let i = 0; i < firstDayOfMonth; i++) calCells.push(null)
@@ -387,116 +403,107 @@ export default function CalendarView() {
   const formatSelectedDate = () => {
     const [y, m, d] = selectedDate.split('-').map(Number)
     return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+      weekday: 'long', month: 'long', day: 'numeric',
     })
   }
 
   // ── Render ──
   return (
     <div>
-      {/* ── Calendar grid ── */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <button className="btn btn-ghost btn-sm" onClick={prevMonth} style={{ padding: '4px 10px', fontSize: 18 }}>‹</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontWeight: 700, fontSize: 15 }}>
+      {/* ── Row 1: Calendar (left) + Macro rings (right) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 24, marginBottom: 24, alignItems: 'start' }}>
+
+        {/* Calendar */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <button className="btn btn-ghost btn-sm" onClick={prevMonth} style={{ padding: '2px 8px', fontSize: 16 }}>‹</button>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>
               {MONTHS[viewMonth - 1]} {viewYear}
             </span>
-            {selectedDate !== today && (
-              <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={goToToday}>
-                Today
-              </button>
-            )}
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={nextMonth} style={{ padding: '4px 10px', fontSize: 18 }}>›</button>
-        </div>
-
-        {/* Day-of-week headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
-          {DAYS_SHORT.map(d => (
-            <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', padding: '2px 0' }}>
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* Day cells */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
-          {calCells.map((dateStr, idx) => {
-            if (!dateStr) return <div key={`empty-${idx}`} />
-            const isSelected = dateStr === selectedDate
-            const isToday    = dateStr === today
-            const isFuture   = dateStr > today
-            return (
-              <button
-                key={dateStr}
-                onClick={() => !isFuture && handleSelectDate(dateStr)}
-                disabled={isFuture}
-                style={{
-                  padding: '7px 4px',
-                  textAlign: 'center',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: 13,
-                  fontWeight: isSelected || isToday ? 700 : 400,
-                  background: isSelected
-                    ? 'var(--accent)'
-                    : isToday
-                    ? 'var(--bg-input)'
-                    : 'transparent',
-                  color: isSelected
-                    ? '#fff'
-                    : isToday
-                    ? 'var(--accent)'
-                    : isFuture
-                    ? 'var(--text-muted)'
-                    : 'var(--text-primary)',
-                  border: isToday && !isSelected
-                    ? '1px solid var(--accent)'
-                    : '1px solid transparent',
-                  cursor: isFuture ? 'default' : 'pointer',
-                  opacity: isFuture ? 0.35 : 1,
-                  transition: 'background 0.1s',
-                }}
-              >
-                {parseInt(dateStr.split('-')[2])}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* ── Day detail ── */}
-      {loadingLog ? (
-        <div className="loading">Loading…</div>
-      ) : logError ? (
-        <div className="alert alert-danger">{logError}</div>
-      ) : log ? (
-        <div>
-          {/* Day header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{formatSelectedDate()}</h2>
-            {selectedDate === today && <span className="badge badge-success">Today</span>}
-            <span className={`badge ${tssInfo.cls}`} style={{ fontSize: 11 }}>{tssInfo.text}</span>
+            <button className="btn btn-ghost btn-sm" onClick={nextMonth} style={{ padding: '2px 8px', fontSize: 16 }}>›</button>
           </div>
 
-          {mammalWarning && (
-            <div className="alert alert-danger mb-16">
-              &#9888; Mammal meat detected — conflicts with your dietary restriction.
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, marginBottom: 3 }}>
+            {DAYS_SHORT.map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', padding: '2px 0' }}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {calCells.map((dateStr, idx) => {
+              if (!dateStr) return <div key={`e-${idx}`} />
+              const isSelected = dateStr === selectedDate
+              const isToday    = dateStr === today
+              const isFuture   = dateStr > today
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => !isFuture && handleSelectDate(dateStr)}
+                  disabled={isFuture}
+                  style={{
+                    padding: '5px 2px',
+                    textAlign: 'center',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontWeight: isSelected || isToday ? 700 : 400,
+                    background: isSelected
+                      ? 'var(--accent)'
+                      : isToday
+                      ? 'var(--bg-input)'
+                      : 'transparent',
+                    color: isSelected
+                      ? '#fff'
+                      : isToday
+                      ? 'var(--accent)'
+                      : isFuture
+                      ? 'var(--text-muted)'
+                      : 'var(--text-primary)',
+                    border: isToday && !isSelected ? '1px solid var(--accent)' : '1px solid transparent',
+                    cursor: isFuture ? 'default' : 'pointer',
+                    opacity: isFuture ? 0.35 : 1,
+                  }}
+                >
+                  {parseInt(dateStr.split('-')[2])}
+                </button>
+              )
+            })}
+          </div>
+
+          {selectedDate !== today && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ width: '100%', marginTop: 10, fontSize: 11 }}
+              onClick={() => handleSelectDate(todayEST())}
+            >
+              Jump to Today
+            </button>
           )}
-          {log.special_instructions ? (
-            <div className="alert alert-info mb-16">&#8505; {log.special_instructions}</div>
-          ) : null}
+        </div>
 
-          {/* ── Macro tracker (top) ── */}
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <span className="card-title" style={{ marginBottom: 0 }}>Daily Targets</span>
-              <span className="text-muted" style={{ fontSize: 12 }}>
-                TDEE {Math.round(log.tdee)} kcal · TSS {log.tss}
-              </span>
+        {/* Macro rings / Daily targets */}
+        {loadingLog ? (
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
+            <div className="loading" style={{ margin: 0 }}>Loading…</div>
+          </div>
+        ) : logError ? (
+          <div className="alert alert-danger">{logError}</div>
+        ) : log ? (
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{formatSelectedDate()}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                  TDEE {Math.round(log.tdee)} kcal · TSS {log.tss}
+                  {selectedDate === today && (
+                    <span className="badge badge-success" style={{ marginLeft: 8 }}>Today</span>
+                  )}
+                </div>
+              </div>
+              <span className={`badge ${tssInfo.cls}`}>{tssInfo.text}</span>
             </div>
-            <div className="macro-rings" style={{ marginBottom: 16 }}>
+            <div className="macro-rings" style={{ marginBottom: 14 }}>
               <MacroRing label="Calories" current={totalConsumed.calories}  target={log.target_calories}  color="var(--cal-color)"     unit="kcal" />
               <MacroRing label="Protein"  current={totalConsumed.protein_g} target={log.target_protein_g} color="var(--protein-color)" />
               <MacroRing label="Carbs"    current={totalConsumed.carbs_g}   target={log.target_carbs_g}   color="var(--carbs-color)" />
@@ -509,401 +516,425 @@ export default function CalendarView() {
               <MacroBar label="Fat"     current={totalConsumed.fat_g}     target={log.target_fat_g}     color="var(--fat-color)" />
             </div>
           </div>
+        ) : null}
+      </div>
 
-          {/* ── Two-column: training (left) + food (right) ── */}
-          <div className="grid-2 gap-24" style={{ alignItems: 'start' }}>
+      {/* ── Row 2: Training (left) + Food (right) ── */}
+      {!loadingLog && !logError && log && (
+        <div className="grid-2 gap-24" style={{ alignItems: 'start' }}>
 
-            {/* ═══ Training panel ═══ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* ═══ Training panel ═══ */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* TSS */}
-              <div className="card">
-                <div className="card-title">Training Stress Score</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div className="flex gap-8 items-center">
-                    <input
-                      className="form-input"
-                      type="number"
-                      min={0}
-                      style={{ width: 90, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                      value={tssInput}
-                      onChange={e => { setTssInput(e.target.value); setTssSource('manual') }}
-                      onKeyDown={e => e.key === 'Enter' && handleSaveTSS()}
-                    />
-                    <span className={`badge ${tssInfo.cls}`}>{tssInfo.text}</span>
-                  </div>
-                  {tssSource === 'file' && (
-                    <div className="text-sm text-muted">↑ Auto-filled from uploaded file — edit if needed</div>
-                  )}
-                  <div className="flex gap-8 items-center">
-                    <button className="btn btn-primary btn-sm" onClick={handleSaveTSS} disabled={savingTSS}>
-                      {savingTSS ? 'Saving…' : 'Save TSS'}
-                    </button>
-                    {tssSaved && <span className="text-sm text-success">Saved — macro targets updated</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Training notes */}
-              <div className="card">
-                <div className="card-title">Training Notes</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <textarea
-                    className="form-textarea"
-                    style={{ minHeight: 96 }}
-                    value={trainingNotes}
-                    onChange={e => setTrainingNotes(e.target.value)}
-                    placeholder={"Add context about today's training.\n\nExamples:\n• \"Easy 1hr run, felt tired — likely under-fueled\"\n• \"Long ride 4hr, good legs, hit all intervals\""}
-                  />
-                  <div className="flex gap-8 items-center">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={handleSaveNotes}
-                      disabled={savingNotes || !trainingNotes.trim()}
-                    >
-                      {savingNotes ? 'Saving…' : 'Save Notes'}
-                    </button>
-                    {notesSaved && <span className="text-sm text-success">Saved</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* File upload */}
-              <div className="card">
-                <div className="card-title">
-                  Import File{' '}
-                  <span className="text-muted" style={{ fontWeight: 400 }}>(optional)</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <input
-                    type="file"
-                    accept=".fit,.json"
-                    className="form-input"
-                    style={{ padding: '7px 12px' }}
-                    onChange={e => {
-                      setFile(e.target.files[0] || null)
-                      setUploadResult(null)
-                      setUploadError(null)
-                    }}
-                  />
+            {/* Training notes + TSS estimation */}
+            <div className="card">
+              <div className="card-title">Training Log</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: 100 }}
+                  value={trainingNotes}
+                  onChange={e => setTrainingNotes(e.target.value)}
+                  placeholder={"Describe your training session.\n\nExamples:\n• \"90min easy zone-2 ride, avg HR 135, felt good\"\n• \"4hr long ride followed by 30min brick run\"\n• \"Rest day — light stretch only\""}
+                />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={handleUpload}
-                    disabled={!file || uploading}
+                    onClick={handleEstimateTSS}
+                    disabled={estimatingTSS || !trainingNotes.trim()}
                   >
-                    {uploading ? 'Parsing…' : 'Parse File'}
+                    {estimatingTSS ? 'Estimating…' : 'Estimate TSS from Notes'}
                   </button>
-                  {uploadError && (
-                    <div className="alert alert-danger" style={{ fontSize: 12 }}>{uploadError}</div>
-                  )}
-                  {uploadResult && (
-                    <div
-                      className={`alert ${uploadResult.tss !== null ? 'alert-info' : 'alert-warning'}`}
-                      style={{ fontSize: 12 }}
-                    >
-                      {uploadResult.message}
-                      {uploadResult.tss !== null && ` · TSS: ${Math.round(uploadResult.tss)}`}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Day notes */}
-              <div className="card">
-                <div className="card-title">Day Notes</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <textarea
-                    className="form-textarea"
-                    style={{ minHeight: 56 }}
-                    value={instructions}
-                    onChange={e => setInstructions(e.target.value)}
-                    placeholder={`e.g. "race tomorrow — carb load", "traveling, limited options"`}
-                  />
                   <button
                     className="btn btn-ghost btn-sm"
-                    style={{ alignSelf: 'flex-end' }}
-                    onClick={handleSaveInstructions}
-                    disabled={savingInstructions}
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes || !trainingNotes.trim()}
                   >
-                    {savingInstructions ? 'Saving…' : 'Save Note'}
+                    {savingNotes ? 'Saving…' : 'Save Notes'}
                   </button>
+                  {notesSaved && <span className="text-sm text-success">Saved</span>}
+                </div>
+                {tssEstimateError && (
+                  <div className="alert alert-danger" style={{ fontSize: 12 }}>{tssEstimateError}</div>
+                )}
+              </div>
+            </div>
+
+            {/* TSS input */}
+            <div className="card">
+              <div className="card-title">Training Stress Score</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="flex gap-8 items-center">
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={0}
+                    style={{ width: 90, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                    value={tssInput}
+                    onChange={e => { setTssInput(e.target.value); setTssSource('manual') }}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveTSS()}
+                  />
+                  <span className={`badge ${tssInfo.cls}`}>{tssInfo.text}</span>
+                </div>
+                {tssReasoning && (
+                  <div className="text-sm text-muted" style={{ lineHeight: 1.5 }}>
+                    {tssReasoning}
+                  </div>
+                )}
+                {tssSource === 'file' && !tssReasoning && (
+                  <div className="text-sm text-muted">↑ Auto-filled from uploaded file — edit if needed</div>
+                )}
+                <div className="flex gap-8 items-center">
+                  <button className="btn btn-primary btn-sm" onClick={handleSaveTSS} disabled={savingTSS}>
+                    {savingTSS ? 'Saving…' : 'Save TSS'}
+                  </button>
+                  {tssSaved && <span className="text-sm text-success">Saved — macro targets updated</span>}
                 </div>
               </div>
             </div>
 
-            {/* ═══ Food panel ═══ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-
-              {/* Quick totals bar */}
-              <div className="card" style={{ padding: '10px 16px', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>
-                    {Math.round(totalConsumed.calories)} / {Math.round(log.target_calories)} kcal
-                  </span>
-                  <div style={{ display: 'flex', gap: 14, fontSize: 12 }}>
-                    <span>
-                      <span className="macro-protein">{Math.round(totalConsumed.protein_g)}g</span>
-                      {' '}<span className="text-muted">P</span>
-                    </span>
-                    <span>
-                      <span className="macro-carbs">{Math.round(totalConsumed.carbs_g)}g</span>
-                      {' '}<span className="text-muted">C</span>
-                    </span>
-                    <span>
-                      <span className="macro-fat">{Math.round(totalConsumed.fat_g)}g</span>
-                      {' '}<span className="text-muted">F</span>
-                    </span>
-                  </div>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: 11 }}
-                    onClick={() => setShowLibrary(true)}
-                  >
-                    + Library
-                  </button>
-                </div>
+            {/* File upload */}
+            <div className="card">
+              <div className="card-title">
+                Import File{' '}
+                <span className="text-muted" style={{ fontWeight: 400 }}>(optional)</span>
               </div>
-
-              {/* Meal category sections */}
-              {CATEGORIES.map(cat => {
-                const catEntries = byCategory[cat.key] || []
-                const sec = getSection(cat.key)
-                const catCals  = catEntries.reduce((a, e) => a + e.calories,  0)
-                const catProt  = catEntries.reduce((a, e) => a + e.protein_g, 0)
-                const catCarbs = catEntries.reduce((a, e) => a + e.carbs_g,   0)
-                const catFat   = catEntries.reduce((a, e) => a + e.fat_g,     0)
-
-                return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <input
+                  type="file"
+                  accept=".fit,.json"
+                  className="form-input"
+                  style={{ padding: '7px 12px' }}
+                  onChange={e => {
+                    setFile(e.target.files[0] || null)
+                    setUploadResult(null)
+                    setUploadError(null)
+                  }}
+                />
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleUpload}
+                  disabled={!file || uploading}
+                >
+                  {uploading ? 'Parsing…' : 'Parse File'}
+                </button>
+                {uploadError && (
+                  <div className="alert alert-danger" style={{ fontSize: 12 }}>{uploadError}</div>
+                )}
+                {uploadResult && (
                   <div
-                    key={cat.key}
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-lg)',
-                      marginBottom: 12,
-                      overflow: 'hidden',
-                    }}
+                    className={`alert ${uploadResult.tss !== null ? 'alert-info' : 'alert-warning'}`}
+                    style={{ fontSize: 12 }}
                   >
-                    {/* Section header */}
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 16px',
-                      borderBottom: (catEntries.length > 0 || sec.preview) ? '1px solid var(--border)' : 'none',
-                      background: 'var(--bg-surface)',
-                    }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                        {cat.label}
-                      </span>
-                      {catEntries.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            <span className="macro-protein">{Math.round(catProt)}g</span>
-                            {' · '}
-                            <span className="macro-carbs">{Math.round(catCarbs)}g</span>
-                            {' · '}
-                            <span className="macro-fat">{Math.round(catFat)}g</span>
-                            {' · '}
-                            <span className="macro-cal">{Math.round(catCals)} kcal</span>
-                          </span>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            style={{ fontSize: 10, padding: '2px 7px', opacity: 0.7 }}
-                            onClick={() => openSaveLib(cat.key, catEntries)}
-                          >
-                            Save to lib
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {uploadResult.message}
+                    {uploadResult.tss !== null && ` · TSS: ${Math.round(uploadResult.tss)}`}
+                  </div>
+                )}
+              </div>
+            </div>
 
-                    {/* Logged entries */}
+            {/* Day notes */}
+            <div className="card">
+              <div className="card-title">Day Notes</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: 56 }}
+                  value={instructions}
+                  onChange={e => setInstructions(e.target.value)}
+                  placeholder={`e.g. "race tomorrow — carb load", "traveling, limited options"`}
+                />
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ alignSelf: 'flex-end' }}
+                  onClick={handleSaveInstructions}
+                  disabled={savingInstructions}
+                >
+                  {savingInstructions ? 'Saving…' : 'Save Note'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ═══ Food panel ═══ */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+            {/* Quick totals bar */}
+            <div className="card" style={{ padding: '10px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>
+                  {Math.round(totalConsumed.calories)} / {Math.round(log.target_calories)} kcal
+                </span>
+                <div style={{ display: 'flex', gap: 14, fontSize: 12 }}>
+                  <span>
+                    <span className="macro-protein">{Math.round(totalConsumed.protein_g)}g</span>
+                    {' '}<span className="text-muted">P</span>
+                  </span>
+                  <span>
+                    <span className="macro-carbs">{Math.round(totalConsumed.carbs_g)}g</span>
+                    {' '}<span className="text-muted">C</span>
+                  </span>
+                  <span>
+                    <span className="macro-fat">{Math.round(totalConsumed.fat_g)}g</span>
+                    {' '}<span className="text-muted">F</span>
+                  </span>
+                </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: 11 }}
+                  onClick={() => setShowLibrary(true)}
+                >
+                  + Library
+                </button>
+              </div>
+            </div>
+
+            {/* Meal category sections */}
+            {CATEGORIES.map(cat => {
+              const catEntries = byCategory[cat.key] || []
+              const sec = getSection(cat.key)
+              const catCals  = catEntries.reduce((a, e) => a + e.calories,  0)
+              const catProt  = catEntries.reduce((a, e) => a + e.protein_g, 0)
+              const catCarbs = catEntries.reduce((a, e) => a + e.carbs_g,   0)
+              const catFat   = catEntries.reduce((a, e) => a + e.fat_g,     0)
+
+              return (
+                <div
+                  key={cat.key}
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                    marginBottom: 12,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 16px',
+                    borderBottom: (catEntries.length > 0 || sec.preview) ? '1px solid var(--border)' : 'none',
+                    background: 'var(--bg-surface)',
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      {cat.label}
+                    </span>
                     {catEntries.length > 0 && (
-                      <div style={{ padding: '4px 16px' }}>
-                        {catEntries.map(e => {
-                          const isEditing = editingServings[e.id] !== undefined
-                          return (
-                            <div key={e.id} className="food-entry">
-                              <div className="food-entry-info">
-                                <div className="food-entry-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                  {e.description}
-                                  {e.has_mammal && <span className="badge badge-danger">Mammal</span>}
-                                </div>
-                                <div className="food-entry-macros" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                  <span className="macro-protein">{Math.round(e.protein_g)}g P</span>
-                                  {' · '}
-                                  <span className="macro-carbs">{Math.round(e.carbs_g)}g C</span>
-                                  {' · '}
-                                  <span className="macro-fat">{Math.round(e.fat_g)}g F</span>
-                                  {!isEditing && (
-                                    <span
-                                      style={{ marginLeft: 4, cursor: 'pointer', opacity: 0.5, fontSize: 11 }}
-                                      onClick={() => handleServingsChange(e.id, String(e.servings || 1))}
-                                    >
-                                      {e.servings && e.servings !== 1 ? `${e.servings}×` : ''} ✎
-                                    </span>
-                                  )}
-                                  {isEditing && (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      <input
-                                        type="number" min="0.5" step="0.5" autoFocus
-                                        value={editingServings[e.id]}
-                                        onChange={ev => handleServingsChange(e.id, ev.target.value)}
-                                        onKeyDown={ev => {
-                                          if (ev.key === 'Enter') handleServingsSave(e)
-                                          if (ev.key === 'Escape') setEditingServings(s => { const n={...s}; delete n[e.id]; return n })
-                                        }}
-                                        style={{ width: 48, fontSize: 12, padding: '2px 4px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }}
-                                      />
-                                      <span className="text-muted" style={{ fontSize: 11 }}>srv</span>
-                                      <button className="btn btn-primary btn-sm" style={{ padding: '2px 7px', fontSize: 11 }} onClick={() => handleServingsSave(e)}>✓</button>
-                                      <button className="btn btn-ghost btn-sm" style={{ padding: '2px 5px', fontSize: 11 }} onClick={() => setEditingServings(s => { const n={...s}; delete n[e.id]; return n })}>✕</button>
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span className="food-entry-cal">{Math.round(e.calories)} kcal</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          <span className="macro-protein">{Math.round(catProt)}g</span>
+                          {' · '}
+                          <span className="macro-carbs">{Math.round(catCarbs)}g</span>
+                          {' · '}
+                          <span className="macro-fat">{Math.round(catFat)}g</span>
+                          {' · '}
+                          <span className="macro-cal">{Math.round(catCals)} kcal</span>
+                        </span>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 10, padding: '2px 7px', opacity: 0.7 }}
+                          onClick={() => openSaveLib(cat.key, catEntries)}
+                        >
+                          Save to lib
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {catEntries.length > 0 && (
+                    <div style={{ padding: '4px 16px' }}>
+                      {catEntries.map(e => {
+                        const isEditing = editingServings[e.id] !== undefined
+                        return (
+                          <div key={e.id} className="food-entry">
+                            <div className="food-entry-info">
+                              <div className="food-entry-name">{e.description}</div>
+                              <div className="food-entry-macros" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span className="macro-protein">{Math.round(e.protein_g)}g P</span>
+                                {' · '}
+                                <span className="macro-carbs">{Math.round(e.carbs_g)}g C</span>
+                                {' · '}
+                                <span className="macro-fat">{Math.round(e.fat_g)}g F</span>
                                 {!isEditing && (
-                                  <button
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => handleDeleteEntry(e.id)}
-                                    style={{ padding: '2px 7px', fontSize: 11, opacity: 0.6 }}
-                                  >✕</button>
+                                  <span
+                                    style={{ marginLeft: 4, cursor: 'pointer', opacity: 0.5, fontSize: 11 }}
+                                    onClick={() => handleServingsChange(e.id, String(e.servings || 1))}
+                                  >
+                                    {e.servings && e.servings !== 1 ? `${e.servings}×` : ''} ✎
+                                  </span>
+                                )}
+                                {isEditing && (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <input
+                                      type="number" min="0.5" step="0.5" autoFocus
+                                      value={editingServings[e.id]}
+                                      onChange={ev => handleServingsChange(e.id, ev.target.value)}
+                                      onKeyDown={ev => {
+                                        if (ev.key === 'Enter') handleServingsSave(e)
+                                        if (ev.key === 'Escape') setEditingServings(s => { const n={...s}; delete n[e.id]; return n })
+                                      }}
+                                      style={{ width: 48, fontSize: 12, padding: '2px 4px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }}
+                                    />
+                                    <span className="text-muted" style={{ fontSize: 11 }}>srv</span>
+                                    <button className="btn btn-primary btn-sm" style={{ padding: '2px 7px', fontSize: 11 }} onClick={() => handleServingsSave(e)}>✓</button>
+                                    <button className="btn btn-ghost btn-sm" style={{ padding: '2px 5px', fontSize: 11 }} onClick={() => setEditingServings(s => { const n={...s}; delete n[e.id]; return n })}>✕</button>
+                                  </span>
                                 )}
                               </div>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {/* NLP preview */}
-                    {sec.preview && (
-                      <div style={{ padding: '12px 16px', background: 'rgba(0,200,255,0.04)', borderTop: catEntries.length > 0 ? '1px solid var(--border)' : 'none' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                          Review before saving
-                        </div>
-                        {sec.preview.has_mammal_flag && (
-                          <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>
-                            &#9888; Mammal meat detected in this entry.
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span className="food-entry-cal">{Math.round(e.calories)} kcal</span>
+                              {!isEditing && (
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => handleDeleteEntry(e.id)}
+                                  style={{ padding: '2px 7px', fontSize: 11, opacity: 0.6 }}
+                                >✕</button>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        {sec.preview.items.map((item, i) => {
-                          const srv = parseFloat((sec.previewServings || {})[i]) || 1
-                          return (
-                            <div key={i} style={{
-                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                              padding: '5px 0',
-                              borderBottom: i < sec.preview.items.length - 1 ? '1px solid var(--border)' : 'none',
-                              gap: 8,
-                            }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
-                                <span className="text-muted" style={{ fontSize: 12, marginLeft: 6 }}>({item.amount})</span>
-                                {item.has_mammal && <span className="badge badge-danger" style={{ marginLeft: 6 }}>Mammal</span>}
-                                <div className="food-entry-macros" style={{ marginTop: 1 }}>
-                                  <span className="macro-protein">{Math.round(item.protein_g * srv)}g P</span>
-                                  {' · '}
-                                  <span className="macro-carbs">{Math.round(item.carbs_g * srv)}g C</span>
-                                  {' · '}
-                                  <span className="macro-fat">{Math.round(item.fat_g * srv)}g F</span>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                                <input
-                                  type="number" min="0.5" step="0.5"
-                                  value={(sec.previewServings || {})[i] ?? 1}
-                                  onChange={ev => updateSection(cat.key, {
-                                    previewServings: { ...(sec.previewServings || {}), [i]: ev.target.value }
-                                  })}
-                                  style={{ width: 44, fontSize: 12, padding: '2px 4px', textAlign: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }}
-                                />
-                                <span className="text-muted" style={{ fontSize: 11 }}>srv</span>
-                                <span className="food-entry-cal" style={{ minWidth: 58, textAlign: 'right' }}>
-                                  {Math.round(item.calories * srv)} kcal
-                                </span>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {sec.preview && (
+                    <div style={{ padding: '12px 16px', background: 'rgba(0,200,255,0.04)', borderTop: catEntries.length > 0 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                        Review before saving
+                      </div>
+                      {sec.preview.items.map((item, i) => {
+                        const srv = parseFloat((sec.previewServings || {})[i]) || 1
+                        return (
+                          <div key={i} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '5px 0',
+                            borderBottom: i < sec.preview.items.length - 1 ? '1px solid var(--border)' : 'none',
+                            gap: 8,
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
+                              <span className="text-muted" style={{ fontSize: 12, marginLeft: 6 }}>({item.amount})</span>
+                              <div className="food-entry-macros" style={{ marginTop: 1 }}>
+                                <span className="macro-protein">{Math.round(item.protein_g * srv)}g P</span>
+                                {' · '}
+                                <span className="macro-carbs">{Math.round(item.carbs_g * srv)}g C</span>
+                                {' · '}
+                                <span className="macro-fat">{Math.round(item.fat_g * srv)}g F</span>
                               </div>
                             </div>
-                          )
-                        })}
-                        <div className="flex gap-8" style={{ marginTop: 10 }}>
-                          <button className="btn btn-primary btn-sm" onClick={() => handleConfirm(cat.key)}>
-                            Confirm & Save
-                          </button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => updateSection(cat.key, { preview: null, input: '' })}>
-                            Cancel
-                          </button>
-                        </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                              <input
+                                type="number" min="0.5" step="0.5"
+                                value={(sec.previewServings || {})[i] ?? 1}
+                                onChange={ev => updateSection(cat.key, {
+                                  previewServings: { ...(sec.previewServings || {}), [i]: ev.target.value }
+                                })}
+                                style={{ width: 44, fontSize: 12, padding: '2px 4px', textAlign: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }}
+                              />
+                              <span className="text-muted" style={{ fontSize: 11 }}>srv</span>
+                              <span className="food-entry-cal" style={{ minWidth: 58, textAlign: 'right' }}>
+                                {Math.round(item.calories * srv)} kcal
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <div className="flex gap-8" style={{ marginTop: 10 }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleConfirm(cat.key)}>
+                          Confirm & Save
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => updateSection(cat.key, { preview: null, input: '' })}>
+                          Cancel
+                        </button>
                       </div>
-                    )}
-
-                    {/* NLP input */}
-                    {!sec.preview && (
-                      <div style={{ padding: '10px 16px', borderTop: catEntries.length > 0 ? '1px solid var(--border)' : 'none' }}>
-                        {sec.error && (
-                          <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>{sec.error}</div>
-                        )}
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                          <AutosizeTextarea
-                            value={sec.input}
-                            onChange={v => updateSection(cat.key, { input: v, error: null })}
-                            onSubmit={() => handleParse(cat.key)}
-                            placeholder={cat.placeholder}
-                            disabled={sec.parsing}
-                          />
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleParse(cat.key)}
-                            disabled={sec.parsing || !sec.input.trim()}
-                            style={{ flexShrink: 0, alignSelf: 'flex-end' }}
-                          >
-                            {sec.parsing ? '…' : 'Log'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* Restaurant meal */}
-              <div className="card">
-                <div className="card-title">Restaurant Meal</div>
-                <div className="text-sm text-muted" style={{ marginBottom: 10 }}>
-                  Describe a restaurant and what you're planning to order — get portion guidance based on your remaining daily targets.
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <textarea
-                    className="form-textarea"
-                    style={{ minHeight: 80 }}
-                    value={restaurantInput}
-                    onChange={e => setRestaurantInput(e.target.value)}
-                    placeholder={`e.g. "Sushi restaurant — thinking salmon rolls, edamame, miso soup"\ne.g. "Italian place — pasta options and grilled fish"`}
-                  />
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleRestaurantEstimate}
-                    disabled={restaurantLoading || !restaurantInput.trim()}
-                    style={{ alignSelf: 'flex-start' }}
-                  >
-                    {restaurantLoading ? 'Estimating…' : 'Get Portion Guidance'}
-                  </button>
-                  {restaurantError && (
-                    <div className="alert alert-danger" style={{ fontSize: 12 }}>{restaurantError}</div>
+                    </div>
                   )}
-                  {restaurantResult && (
-                    <div className="alert alert-info" style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                      {typeof restaurantResult === 'string'
-                        ? restaurantResult
-                        : restaurantResult.guidance || restaurantResult.message || JSON.stringify(restaurantResult, null, 2)}
+
+                  {!sec.preview && (
+                    <div style={{ padding: '10px 16px', borderTop: catEntries.length > 0 ? '1px solid var(--border)' : 'none' }}>
+                      {sec.error && (
+                        <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>{sec.error}</div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                        <AutosizeTextarea
+                          value={sec.input}
+                          onChange={v => updateSection(cat.key, { input: v, error: null })}
+                          onSubmit={() => handleParse(cat.key)}
+                          placeholder={cat.placeholder}
+                          disabled={sec.parsing}
+                        />
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleParse(cat.key)}
+                          disabled={sec.parsing || !sec.input.trim()}
+                          style={{ flexShrink: 0, alignSelf: 'flex-end' }}
+                        >
+                          {sec.parsing ? '…' : 'Log'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
+              )
+            })}
+
+            {/* Plan the rest of the day */}
+            <div className="card">
+              <div className="card-title">Plan the Rest of the Day</div>
+              <div className="text-sm text-muted" style={{ marginBottom: 10 }}>
+                Tell us what you're planning to eat — we'll tell you how much of each to have based on your remaining macros.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: 80 }}
+                  value={planInput}
+                  onChange={e => setPlanInput(e.target.value)}
+                  placeholder={`e.g. "chicken breast, white rice, and steamed broccoli for dinner, then a protein shake"\ne.g. "thinking about pasta or a grain bowl — not sure yet"`}
+                />
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handlePlanRest}
+                  disabled={planLoading || !planInput.trim()}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  {planLoading ? 'Calculating…' : 'Get Macro Guidance'}
+                </button>
+                {planError && (
+                  <div className="alert alert-danger" style={{ fontSize: 12 }}>{planError}</div>
+                )}
+                {planResult && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {planResult.recommendation && (
+                      <div className="alert alert-info" style={{ fontSize: 13, lineHeight: 1.6 }}>
+                        {planResult.recommendation}
+                      </div>
+                    )}
+                    {planResult.portion_guidance && (
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)' }}>
+                        {planResult.portion_guidance}
+                      </div>
+                    )}
+                    {planResult.estimated_macros && (
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+                        <span><span className="macro-cal">{Math.round(planResult.estimated_macros.calories)} kcal</span></span>
+                        <span><span className="macro-protein">{Math.round(planResult.estimated_macros.protein_g)}g</span> P</span>
+                        <span><span className="macro-carbs">{Math.round(planResult.estimated_macros.carbs_g)}g</span> C</span>
+                        <span><span className="macro-fat">{Math.round(planResult.estimated_macros.fat_g)}g</span> F</span>
+                      </div>
+                    )}
+                    {planResult.flags && planResult.flags.length > 0 && (
+                      <div className="alert alert-warning" style={{ fontSize: 12 }}>
+                        {planResult.flags.join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* ── Meal library modal ── */}
       {showLibrary && (
@@ -929,7 +960,6 @@ export default function CalendarView() {
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
                           <div className="text-sm text-muted">
                             {Math.round(m.calories * servings)} kcal · {Math.round(m.protein_g * servings)}g P · {Math.round(m.carbs_g * servings)}g C · {Math.round(m.fat_g * servings)}g F
-                            <span style={{ marginLeft: 8, opacity: 0.5 }}>{m.meal_type}</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>

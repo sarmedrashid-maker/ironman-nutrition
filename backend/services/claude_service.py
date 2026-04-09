@@ -110,6 +110,51 @@ If the amount is ambiguous, use a standard serving size and note it in the name 
     return parsed
 
 
+async def estimate_tss_from_notes(notes: str) -> dict:
+    """
+    Estimate TSS from a plain-language training session description.
+    Returns {tss: int, reasoning: str}.
+    """
+    client = get_client()
+
+    prompt = f"""You are a sports science assistant for an Ironman triathlete.
+
+Based on the training session description below, estimate the Training Stress Score (TSS).
+
+TSS scale reference:
+- 0: Rest day (no training)
+- 1–49: Easy (recovery ride/run/swim, <1hr low intensity)
+- 50–99: Moderate (90min zone-2 work, steady aerobic session)
+- 100–149: Hard (long intervals, hard brick, tempo run, 2–3hr ride)
+- 150–199: Very Hard (race simulation, 4–5hr long ride, back-to-back hard sessions)
+- 200+: Extreme (full race day, multiple long hard sessions)
+
+Training description: "{notes}"
+
+Return ONLY valid JSON — no prose, no markdown:
+{{"tss": <integer>, "reasoning": "<1-2 sentence explanation>"}}"""
+
+    message = await client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=256,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = message.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Claude returned invalid JSON: {e}\nRaw: {raw[:300]}")
+
+    return {"tss": int(parsed["tss"]), "reasoning": parsed.get("reasoning", "")}
+
+
 async def estimate_eating_out(
     description: str,
     remaining_targets: dict,
