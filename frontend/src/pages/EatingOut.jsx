@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api } from '../api'
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 export default function EatingOut() {

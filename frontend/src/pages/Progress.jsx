@@ -7,13 +7,17 @@ import { api } from '../api'
 import { useUser } from '../contexts/UserContext'
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 function addDays(isoDate, days) {
-  const d = new Date(isoDate + 'T00:00:00')
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + days)
+  return [
+    dt.getFullYear(),
+    String(dt.getMonth() + 1).padStart(2, '0'),
+    String(dt.getDate()).padStart(2, '0'),
+  ].join('-')
 }
 
 function formatDateLabel(isoDate) {

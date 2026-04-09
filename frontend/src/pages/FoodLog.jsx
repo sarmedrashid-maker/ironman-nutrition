@@ -3,7 +3,7 @@ import { api } from '../api'
 import { useUser } from '../contexts/UserContext'
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 const CATEGORIES = [

@@ -5,7 +5,7 @@ import { useUser } from '../contexts/UserContext'
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 const emptyForm = (mealType = 'breakfast') => ({

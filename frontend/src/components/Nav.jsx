@@ -2,12 +2,10 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useUser } from '../contexts/UserContext'
 
 const links = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/log',       label: 'Food Log' },
-  { to: '/meals',     label: 'Meal Library' },
-  { to: '/training',  label: 'Training' },
-  { to: '/progress',  label: 'Progress' },
-  { to: '/profile',   label: 'Profile' },
+  { to: '/calendar', label: 'Calendar' },
+  { to: '/meals',    label: 'Meal Library' },
+  { to: '/progress', label: 'Progress' },
+  { to: '/profile',  label: 'Profile' },
 ]
 
 export default function Nav() {

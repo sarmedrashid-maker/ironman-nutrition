@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { UserProvider, useUser } from './contexts/UserContext'
 import Nav from './components/Nav'
 import Login from './pages/Login'
+import CalendarView from './pages/CalendarView'
 import Dashboard from './pages/Dashboard'
 import FoodLog from './pages/FoodLog'
 import MealLibrary from './pages/MealLibrary'
@@ -26,8 +27,9 @@ function AuthenticatedApp() {
       <Nav />
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/calendar" replace />} />
+          <Route path="/login" element={<Navigate to="/calendar" replace />} />
+          <Route path="/calendar" element={<CalendarView />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/log" element={<FoodLog />} />
           <Route path="/meals" element={<MealLibrary />} />

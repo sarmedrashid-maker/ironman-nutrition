@@ -5,7 +5,7 @@ import MacroRing from '../components/MacroRing'
 import MacroBar from '../components/MacroBar'
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 function sum(entries, field) {
@@ -37,9 +37,13 @@ export default function Dashboard() {
   const [date, setDate] = useState(todayISO())
 
   const shiftDay = (n) => {
-    const d = new Date(date + 'T00:00:00')
-    d.setDate(d.getDate() + n)
-    setDate(d.toISOString().slice(0, 10))
+    const [y, m, d] = date.split('-').map(Number)
+    const dt = new Date(y, m - 1, d + n)
+    setDate([
+      dt.getFullYear(),
+      String(dt.getMonth() + 1).padStart(2, '0'),
+      String(dt.getDate()).padStart(2, '0'),
+    ].join('-'))
   }
 
   const loadLog = useCallback(() => api.foodLog.get(date, userId).then(setLog), [date, userId])
